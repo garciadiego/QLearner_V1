@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 
-import gym
+
 env = gym.make('CartPole-v0')
 for i_episode in range(20):
     observation = env.reset()
