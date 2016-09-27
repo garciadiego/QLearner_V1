@@ -9,7 +9,7 @@ import tensorflow as tf
 def softmax(x):
     dg_exp_= np.exp(x - np.max(x))
     ans = dg_exp_ / dg_exp_.sum()
-    return out
+    return ans
 
 env = gym.make('CartPole-v0')
 for i_episode in range(20):
