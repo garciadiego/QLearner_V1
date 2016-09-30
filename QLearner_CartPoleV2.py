@@ -1,92 +1,86 @@
-import tensorflow as tf
-import numpy as np
-import random
 import gym
+import numpy as np
+import tensorflow as tf
 
-#Reinforcement Learning Method
-def policy():
-    with tf.variable_scope("policy"):
-        parameters = tf.get_variable("policy_parameters",[4,2])
-        #place holder for correct answers
-        state = tf.placeholder(tf.float32,[None,4]) #dim any lenght x 4 (4 observations)
-        actions = tf.placeholder(tf.float32,[None,2]) #dim any lenght x 2 (actions)
-        advantages = tf.placeholder(tf.float32,[None,1]) #dim any lenght X 1 (Reward)
-        y = tf.matmul(state,parameters)
-        y_ = tf.nn.softmax(y)
-        weights = tf.reduce_sum(tf.mul(y_, actions), reduction_indices=[1])
-        eligibility = tf.log(weights) * advantages
-        loss = -tf.reduce_sum(eligibility)
-        train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
-        return y, state, actions, advantages, train_step
+def weights_x(shape):
+  initial = tf.truncated_normal(shape, stddev=0.1)
+  return tf.Variable(initial)
 
+def bias_x(shape):
+  initial = tf.zeros(shape, dtype=tf.float32, name=None)
+  return tf.Variable(initial)
 
-#Model
-def model():
-    with tf.variable_scope("value"):
-        state = tf.placeholder("float",[None,4]) #place holder for input
-        newStates = tf.placeholder("float",[None,1]) #place holder for output
-
-        #First Layer
-        w1 = tf.get_variable("w1",[4,10])
-        b1 = tf.get_variable("b1",[10])
-        w2 = tf.get_variable("w2",[10,1])
-        b2 = tf.get_variable("b2",[1])
-        h1 = tf.nn.relu(tf.matmul(state,w1) + b1) #activation function
-
-        calculated_lay1 = tf.matmul(h1,w2) + b2
-        calculated = calculated_lay1
-        diffs = calculated - newStates
-        loss = tf.nn.l2_loss(diffs**2)
-        train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
-        return calculated, state, newStates,loss, train_step
-
-
-
-
-def run_episode(env, policy, model, sess):
-    observation = env.reset()
-    totalreward = 0
-    states = []
-    actions = []
-    advantages = []
-    transitions = []
-    update_vals = []
-
-
-    for _ in xrange(200):
-        env.render()
-        action = 0 if random.uniform(0,1) < [0][0] else 1 #draw samples from a uniform distribution
-        #action = env.action_space.sample() #random action
-        # record the transition
-        states.append(observation)
-        actionblank = np.zeros(2) #array of zeros
-        actionblank[action] = 1
-        actions.append(actionblank)
-
-        # take the action in the environment
-        #old_observation = observation
-        observation, reward, done, info = env.step(action)
-        transitions.append((observation, action, reward))
-        totalreward += reward
-        if done:
-            break
-
-    return totalreward
-
-#Enviroment Load
+#Envairoment Load and Intial State
 env = gym.make('CartPole-v0')
-episodes_per_update = 5
-#env.monitor.start('cartpole-hill/', force=True)
-
-policy = policy()
-model = model()
+#env.monitor.start('/Users/diegogarcia/Desktop/Deep_Learning/Qlearner_Main/QLearner_V1/cartpole-experiment-1', force=True)
+dim_actions = env.action_space.n
+num_gradients = 1
+maxsteps = 1000
+num_runs = 1000
 sess = tf.InteractiveSession()
-sess.run(tf.initialize_all_variables())
 
-for i in xrange(1000):
-    reward = run_episode(env, policy, model, sess)
-    print "reward %d " % (reward)
-    if reward == 100:
-        break
+#Placeholders
+state = tf.placeholder(tf.float32, shape=[None, 4])
+action_choice = tf.placeholder(tf.float32, shape=[None, dim_actions])
+reward_signal = tf.placeholder(tf.float32, shape=(None,1) )
+n_timesteps = tf.placeholder(tf.float32, shape=())
+
+#Layers
+W1 = weights_x([4, 10])
+b1 = bias_x([10])
+h1 = tf.nn.relu(tf.matmul(state, W1) + b1)
+W2 = weights_x([10, dim_actions])
+b2 = bias_x([dim_actions])
+h2 = tf.nn.softmax(tf.matmul(h1, W2) + b2)
+
+
+tp = tf.transpose(action_choice)
+log_prob = tf.log(tf.diag_part(tf.matmul(h2, tp)))
+log_prob = tf.reshape(log_prob, (1,-1))
+loss = tf.matmul(log_prob, reward_signal)
+loss = -tf.reshape(loss, [-1])
+train_step = tf.train.AdamOptimizer().minimize(loss)
+init = tf.initialize_all_variables()
+sess = tf.Session()
+sess.run(init)
+
+
+timestep_learning = np.zeros((num_runs,1))
+for run in range(num_runs):
+
+    states = np.zeros((maxsteps,4), dtype='float32')
+    actions = np.zeros((maxsteps,dim_actions), dtype='float32')
+    rewards = np.zeros((maxsteps,1), dtype='float32')
+    timestep =0
+    observation = env.reset()
+    observation = np.reshape(observation,(1,4))
+    done = False
+
+    while not done and timestep < maxsteps:
+        if run % 50 == 0:
+            env.render()
+        action_prob = sess.run(h2, feed_dict={state: observation})
+        action = np.argmax(np.random.multinomial(1, action_prob[0]))
+        new_observation, reward, done, info = env.step(action)
+
+        states[timestep, :] = observation
+
+        actions[timestep, action] = 1
+        rewards[timestep, :] = reward
+        timestep += 1
+
+        observation[:] = new_observation
+
+    states = states[:timestep, :]
+    actions = actions[:timestep, :]
+    rewards = rewards[:timestep,:]
+    rewards[:, 0] = np.cumsum(rewards[::-1])[::-1]
+
+    if run % 10 == 0:
+        print (rewards)
+    for i in range(num_gradients):
+        sess.run(train_step, feed_dict={state: states, action_choice: actions, reward_signal: rewards, n_timesteps: timestep})
+    timestep_learning[run] = timestep
 
 #env.monitor.close()
+env.render(close=True)
