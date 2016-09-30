@@ -12,7 +12,7 @@ def bias_x(shape):
 
 #Envairoment Load and Intial State
 env = gym.make('CartPole-v0')
-#env.monitor.start('/Users/diegogarcia/Desktop/Deep_Learning/Qlearner_Main/QLearner_V1/cartpole-experiment-1', force=True)
+env.monitor.start('/Users/diegogarcia/Desktop/Deep_Learning/Qlearner_Main/QLearner_V1/cartpole-experiment-1', force=True)
 dim_actions = env.action_space.n
 num_gradients = 1
 maxsteps = 1000
@@ -82,5 +82,5 @@ for run in range(num_runs):
         sess.run(train_step, feed_dict={state: states, action_choice: actions, reward_signal: rewards, n_timesteps: timestep})
     timestep_learning[run] = timestep
 
-#env.monitor.close()
+env.monitor.close()
 env.render(close=True)
