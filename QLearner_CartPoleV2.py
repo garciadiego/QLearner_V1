@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 def weights_x(shape):
-  initial = tf.truncated_normal(shape, stddev=0.1)
+  initial = tf.truncated_normal(shape)
   return tf.Variable(initial)
 
 def bias_x(shape):
@@ -12,7 +12,7 @@ def bias_x(shape):
 
 #Envairoment Load and Intial State
 env = gym.make('CartPole-v0')
-env.monitor.start('/Users/diegogarcia/Desktop/Deep_Learning/Qlearner_Main/QLearner_V1/cartpole-experiment-1', force=True)
+env.monitor.start('/Users/diegogarcia/Desktop/Deep_Learning/Qlearner_Main/QLearner_V1/cartpole_Hw4_v2', force=True)
 dim_actions = env.action_space.n
 num_gradients = 1
 maxsteps = 1000
@@ -39,7 +39,7 @@ log_prob = tf.log(tf.diag_part(tf.matmul(h2, tp)))
 log_prob = tf.reshape(log_prob, (1,-1))
 loss = tf.matmul(log_prob, reward_signal)
 loss = -tf.reshape(loss, [-1])
-train_step = tf.train.AdamOptimizer().minimize(loss)
+train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
 init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
